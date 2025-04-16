@@ -36,7 +36,20 @@ API_ACCESS_KEY=your_api_key_here
 npm start
 ```
 
-Visit `http://localhost:3000` to use the app.
+Visit `http://localhost:8787` to use the app.
 
 ## API Documentation
 
+### Update DDNS Record
+
+```shell
+curl --ipv4 -X POST 'https://ddns.waynecommand.com/{identifier}' \
+  -H 'Authorization: Bearer {token}'
+```
+
+### Query All Records
+
+```shell
+curl -X GET 'https://ddns.waynecommand.com/records' \
+  -H 'Authorization: Bearer {token}'
+```

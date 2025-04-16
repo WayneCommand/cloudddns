@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Text to Image</title>
+    <title>DDNS</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -30,7 +30,7 @@
 </head>
 <body class="bg-gray-50 min-h-screen">
     <div class="container mx-auto px-4 py-8 max-w-4xl">
-        <h1 class="text-3xl font-bold text-gray-800 mb-8 text-center">AI Text to Image Generator</h1>
+        <h1 class="text-3xl font-bold text-gray-800 mb-8 text-center">DDNS</h1>
         
         <!-- API Key Settings Panel -->
         <div id="apiKeyPanel" class="bg-white rounded-lg shadow-lg p-6 mb-8">
@@ -61,32 +61,9 @@
         <div id="mainContent" class="hidden">
             <div class="bg-white rounded-lg shadow-lg p-6 mb-8">
                 <div class="mb-6">
-                    <label for="model" class="block text-gray-700 font-medium mb-2">Select Model</label>
-                    <select id="model" class="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-400">
-                        <option value="">Loading models...</option>
-                    </select>
-                </div>
-                
-                <div class="mb-6">
-                    <label for="prompt" class="block text-gray-700 font-medium mb-2">Enter Prompt</label>
-                    <textarea id="prompt" rows="4" class="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-400" placeholder="Enter a descriptive text, e.g.: a cute cat"></textarea>
-                </div>
-                
-                <button id="generate" class="w-full bg-gray-700 text-white py-3 rounded-md hover:bg-gray-600 transition-colors">
-                    Generate Image
-                </button>
-            </div>
-            
-            <div id="result" class="hidden">
-                <div class="bg-white rounded-lg shadow-lg p-6">
-                    <h2 class="text-xl font-semibold text-gray-800 mb-4">Generated Result</h2>
-                    <div id="loading" class="hidden">
-                        <div class="flex justify-center items-center py-8">
-                            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-700"></div>
-                        </div>
-                    </div>
-                    <div id="imageContainer" class="flex justify-center">
-                        <img id="generatedImage" class="max-w-full rounded-lg shadow-md" alt="Generated image">
+                    <label for="model" class="block text-gray-700 font-medium mb-2">Records: </label>
+                    <div class="code-block">
+                        <pre id="codeBlock"></pre>
                     </div>
                 </div>
             </div>
@@ -95,7 +72,7 @@
 
     <script>
         // API Key Management
-        const API_KEY_STORAGE_KEY = 'img_ai_api_key';
+        const API_KEY_STORAGE_KEY = 'cloudddns_api_key';
         let currentApiKey = localStorage.getItem(API_KEY_STORAGE_KEY);
 
         function updateApiKeyStatus() {
@@ -134,7 +111,7 @@
                 currentApiKey = newApiKey;
                 toggleApiKeyForm(false);
                 updateApiKeyStatus();
-                loadModels(); // Reload models with new API key
+                loadRecords(); // Reload records with new API key
             } else {
                 alert('Please enter a valid API key');
             }
@@ -155,119 +132,29 @@
         }
 
         // Load available models when page loads
-        async function loadModels() {
+        async function loadRecords() {
+            const codeBlock = document.getElementById('codeBlock');
+            codeBlock.innerHTML = 'Loading records...';
+
             try {
-                const response = await fetch('/v1/models', {
+                const response = await fetch('/records', {
                     headers: getAuthHeaders()
                 });
                 const data = await response.json();
-                
-                const modelSelect = document.getElementById('model');
-                modelSelect.innerHTML = ''; // Clear loading option
-                
-                data.data.forEach(model => {
-                    const option = document.createElement('option');
-                    option.value = model.id;
-                    option.textContent = model.id
-                        .replace('DS-8-CF', 'DreamShaper 8')
-                        .replace('SD-XL-Bash-CF', 'Stable Diffusion XL Base')
-                        .replace('SD-XL-Lightning-CF', 'SD XL Lightning')
-                        .replace('FLUX.1-Schnell-CF', 'FLUX.1 Schnell')
-                        .replace('SF-Kolors', 'Kolors')
-                        .replace('SF-FLUX-schnell', 'FLUX Schnell')
-                        .replace('SF-SD-35large', 'Stable Diffusion 3.5');
-                    modelSelect.appendChild(option);
-                });
+                codeBlock.innerHTML = JSON.stringify(data, null, 2);
             } catch (error) {
-                console.error('Error loading models:', error);
-                document.getElementById('model').innerHTML = '<option value="">Error loading models</option>';
+                console.error('Error loading records:', error);
+                codeBlock.innerHTML = JSON.stringify({error: error.message}, null, 2);  
                 if (error.message === 'Invalid API Key') {
                     alert('Please configure a valid API key');
                 }
             }
         }
 
-        // Load models if API key is configured
+        // Load records if API key is configured
         if (currentApiKey) {
-            loadModels();
+            loadRecords();
         }
-
-        document.getElementById('generate').addEventListener('click', async () => {
-            const prompt = document.getElementById('prompt').value;
-            const model = document.getElementById('model').value;
-            
-            if (!prompt) {
-                alert('Please enter a prompt');
-                return;
-            }
-
-            if (!model) {
-                alert('Please select a model');
-                return;
-            }
-
-            // Show loading state
-            document.getElementById('result').classList.remove('hidden');
-            document.getElementById('loading').classList.remove('hidden');
-            document.getElementById('imageContainer').classList.add('hidden');
-            document.getElementById('generate').disabled = true;
-
-            try {
-                const response = await fetch('/v1/chat/completions', {
-                    method: 'POST',
-                    headers: getAuthHeaders(),
-                    body: JSON.stringify({
-                        model: model,
-                        messages: [
-                            {
-                                role: 'user',
-                                content: prompt
-                            }
-                        ],
-                        stream: true
-                    })
-                });
-
-                const reader = response.body.getReader();
-                let imageUrl = '';
-
-                while (true) {
-                    const { done, value } = await reader.read();
-                    if (done) break;
-
-                    const chunk = new TextDecoder().decode(value);
-                    const lines = chunk.split('\n');
-                    
-                    for (const line of lines) {
-                        if (line.startsWith('data: ') && line !== 'data: [DONE]') {
-                            const jsonData = JSON.parse(line.slice(6));
-                            if (jsonData.choices[0].delta.content) {
-                                const content = jsonData.choices[0].delta.content;
-                                if (content.includes('![')) {
-                                    imageUrl = content.match(/\(([^)]+)\)/)[1];
-                                }
-                            }
-                        }
-                    }
-                }
-
-                if (imageUrl) {
-                    const img = document.getElementById('generatedImage');
-                    img.src = imageUrl;
-                    document.getElementById('loading').classList.add('hidden');
-                    document.getElementById('imageContainer').classList.remove('hidden');
-                }
-            } catch (error) {
-                console.error('Error:', error);
-                if (error.message === 'Invalid API Key') {
-                    alert('Please configure a valid API key');
-                } else {
-                    alert('Error generating image');
-                }
-            } finally {
-                document.getElementById('generate').disabled = false;
-            }
-        });
     </script>
 </body>
 </html>

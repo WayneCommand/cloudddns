@@ -1,8 +1,9 @@
 import { WorkerUtil } from "./WorkerUtil";
 
 // Constants
-
 let STORE_KV: KVNamespace;
+let UNINOTIFY_KEY: string;
+const UNINOTIFY_API = "https://notify.waynecommand.com/wechat"
 
 // 验证授权
 async function isAuthorized(apiKey: string|null): Promise<boolean> {
@@ -15,6 +16,7 @@ export default {
     async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
       // init
       STORE_KV = env.STORE_KV
+      UNINOTIFY_KEY = env.UNINOTIFY_KEY
       const url = new URL(request.url);
       const apiKey = await getRequestApiKey(request);
 
@@ -84,14 +86,19 @@ async function updateDDNSRecord(identifier: string, ip: string, userRecord: User
     }else {
       // 更新记录
       record.unshift({[ip]: new Date().getTime().toString()});
+      console.log(`Record updated [${identifier}]: `, ip);
     }
   }else {
     // 创建记录
     userRecord[identifier] = [{[ip]: new Date().getTime().toString()}];
+    console.log(`Record created [${identifier}]: `, ip);
   }
 
   // 更新用户记录
   await STORE_KV.put(`gh_${userRecord.api_key}`, JSON.stringify(userRecord));
+
+  // 通知
+  await uninotify(identifier, ip);
   
   return new Response("Record updated", { status: 200 });
 }
@@ -103,6 +110,26 @@ async function records(userRecord: UserRecord): Promise<Response> {
   return Response.json(rs)
 }
 
+
+async function uninotify(identifier: string, ip: string) {
+  if (!UNINOTIFY_KEY) return;
+  
+  await fetch(UNINOTIFY_API, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${UNINOTIFY_KEY}`
+    },
+    body: JSON.stringify({
+      title: `${identifier} Record Updated`,
+      content: `DDNS Record Updated: ${identifier} -> ${ip}`
+    })
+  }).catch(e => {
+    console.error(`Failed to notify [${identifier}]`, e);
+  });
+
+  return 0
+}
 
 
 interface UserRecord {
